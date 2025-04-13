@@ -1,10 +1,4 @@
 import streamlit as st
-from datetime import datetime
-import pandas as pd
-import gspread
-from google.oauth2 import service_account
-import urllib.parse
-import base64
 
 # Configuração da página DEVE ser a primeira coisa
 st.set_page_config(
@@ -12,6 +6,14 @@ st.set_page_config(
     page_icon="✂️",
     layout="centered"
 )
+
+# Agora o resto do código
+from datetime import datetime
+import pandas as pd
+import gspread
+from google.oauth2 import service_account
+import urllib.parse
+import base64
 
 # Estilos CSS
 hide_streamlit_style = """
