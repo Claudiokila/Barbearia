@@ -6,19 +6,23 @@ from oauth2client.service_account import ServiceAccountCredentials
 import urllib.parse
 import base64
 
-creds_dict = st.secrets["gcp_service_account"]
-creds_json = json.dumps(creds_dict)
+# Estilos CSS
+hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# Configurações do Google Sheets
+# CONSTANTES
+MAX_AGENDAMENTOS_POR_HORARIO = 1
 SPREADSHEET_ID = "1z0vz0WecZAgZp7PkV3zsx3HHXBv6W_fUEtuDrniY5Jk"
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
-          "https://www.googleapis.com/auth/drive"]
-
-# Função para conectar ao Google Sheets
-def conectar_google_sheets():
-    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_dict, SCOPES)
-    client = gspread.authorize(creds)
-    return client.open_by_key(SPREADSHEET_ID)
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
 
 # Função para carregar configurações
 def carregar_configuracoes(spreadsheet):
