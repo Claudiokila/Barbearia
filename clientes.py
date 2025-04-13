@@ -38,7 +38,7 @@ def get_gspread_client():
         st.error(f"Erro ao conectar ao Google Sheets: {str(e)}")
         st.stop()
 
-# Função para obter a planilha (não cacheada pois o client já é cacheado)
+# Função para obter a planilha
 def get_spreadsheet():
     client = get_gspread_client()
     return client.open_by_key(SPREADSHEET_ID)
@@ -168,6 +168,12 @@ def set_bg_hack():
                 color: #FF6347 !important;
                 font-weight: bold;
             }}
+            .no-availability {{
+                color: #FFD700 !important;
+                font-size: 1.2rem;
+                text-align: center;
+                margin: 2rem 0;
+            }}
             </style>
             """,
             unsafe_allow_html=True
@@ -208,6 +214,12 @@ config = carregar_configuracoes(spreadsheet)
 
 if not config:
     st.error("Erro ao carregar configurações. Por favor, tente novamente mais tarde.")
+    st.stop()
+
+# Verificar disponibilidade
+if not config['datas'] or not config['horarios']:
+    st.markdown('<p class="no-availability">⚠️ No momento não há horários disponíveis para agendamento. Por favor, volte mais tarde.</p>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
 # Formulário de agendamento
