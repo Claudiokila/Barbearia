@@ -5,23 +5,26 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
 import numpy as np
 
-# Configurações do Google Sheets
-# Converte o dicionário em JSON
+# Lê as credenciais do secrets
 creds_dict = st.secrets["gcp_service_account"]
-creds_json = json.dumps(creds_dict)
 
-SPREADSHEET_ID = "1z0vz0WecZAgZp7PkV3zsx3HHXBv6W_fUEtuDrniY5Jk"
+# Escopos de acesso
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
           "https://www.googleapis.com/auth/drive"]
+
+# ID da planilha
+SPREADSHEET_ID = "1z0vz0WecZAgZp7PkV3zsx3HHXBv6W_fUEtuDrniY5Jk"
+
+# Função para conectar ao Google Sheets
+def conectar_google_sheets():
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPES)
+    client = gspread.authorize(creds)
+    return client.open_by_key(SPREADSHEET_ID)
 
 # Configurações do sistema
 MAX_AGENDAMENTOS_POR_HORARIO = 1  # Quantidade máxima de clientes no mesmo horário
 
-# Função para conectar ao Google Sheets
-def conectar_google_sheets():
-    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_dict, SCOPES)
-    client = gspread.authorize(creds)
-    return client.open_by_key(SPREADSHEET_ID)
+
 
 # Função para carregar dados
 def carregar_dados(spreadsheet, sheet_name):
