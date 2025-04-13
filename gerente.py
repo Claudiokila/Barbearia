@@ -18,6 +18,40 @@ hide_streamlit_style = """
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    
+    /* Estilo para os cards de agendamento */
+    .agendamento-card {
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 10px;
+        background-color: #f9f9f9;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .agendamento-card h4 {
+        margin-top: 0;
+        color: #333;
+    }
+    .agendamento-card p {
+        margin-bottom: 5px;
+    }
+    .horario-tag {
+        background-color: #4CAF50;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 5px;
+        font-size: 0.9em;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    .servico-tag {
+        background-color: #2196F3;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 5px;
+        font-size: 0.9em;
+        display: inline-block;
+    }
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -309,7 +343,27 @@ def main():
             if filtro_servico != 'Todos':
                 df_filtrado = df_filtrado[df_filtrado['Serviço'].astype(str) == filtro_servico]
             
-            st.dataframe(df_filtrado, use_container_width=True)
+            # Exibir agendamentos como cards estilizados
+            if not df_filtrado.empty:
+                st.write(f"**Total de agendamentos:** {len(df_filtrado)}")
+                
+                for _, row in df_filtrado.sort_values(['Data', 'Hora']).iterrows():
+                    with st.container():
+                        st.markdown(
+                            f"""
+                            <div class="agendamento-card">
+                                <h4>{row['Nome']}</h4>
+                                <p><span class="horario-tag">{row['Hora']}</span> <span class="servico-tag">{row['Serviço']}</span></p>
+                                <p><strong>Data:</strong> {row['Data']}</p>
+                                <p><strong>Telefone:</strong> {row['Telefone']}</p>
+                                <p><strong>Preço:</strong> R$ {row['Preco']:.2f}</p>
+                                <p><strong>Observações:</strong> {row.get('Observacoes', 'Nenhuma')}</p>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+            else:
+                st.info("Nenhum agendamento encontrado com os filtros selecionados.")
             
             # Remoção de agendamento
             st.subheader("Remover Agendamento")
