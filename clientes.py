@@ -24,6 +24,20 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
+# Função para conectar ao Google Sheets
+def conectar_google_sheets():
+    try:
+        # Carrega as credenciais do arquivo JSON (que deve estar no mesmo diretório)
+        creds = ServiceAccountCredentials.from_json_keyfile_name(
+            "credenciais.json", SCOPES
+        )
+        client = gspread.authorize(creds)
+        spreadsheet = client.open_by_key(SPREADSHEET_ID)
+        return spreadsheet
+    except Exception as e:
+        st.error(f"Erro ao conectar ao Google Sheets: {str(e)}")
+        return None
+
 # Função para carregar configurações
 def carregar_configuracoes(spreadsheet):
     try:
@@ -80,7 +94,6 @@ def remover_horario_disponivel(spreadsheet, hora_agendada):
     except Exception as e:
         st.error(f"Erro ao remover horário disponível: {str(e)}")
         return False
-
 
 # Função para adicionar background
 def set_bg_hack():
@@ -184,6 +197,10 @@ st.title("✂️ Agendamento de Corte")
 
 # Conectar ao Google Sheets
 spreadsheet = conectar_google_sheets()
+
+if spreadsheet is None:
+    st.error("Erro ao conectar ao Google Sheets. Por favor, tente novamente mais tarde.")
+    st.stop()
 
 # Carregar configurações
 config = carregar_configuracoes(spreadsheet)
