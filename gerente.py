@@ -12,7 +12,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos CSS (depois da configuração da página)
+# Estilos CSS
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -30,25 +30,29 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# Função para conectar ao Google Sheets com cache
+# Função para conectar ao Google Sheets
 @st.cache_resource(ttl=3600)
-def conectar_google_sheets():
+def get_gspread_client():
     try:
         creds = service_account.Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],
             scopes=SCOPES
         )
-        client = gspread.authorize(creds)
-        return client.open_by_key(SPREADSHEET_ID)
+        return gspread.authorize(creds)
     except Exception as e:
         st.error(f"Erro ao conectar ao Google Sheets: {str(e)}")
         st.stop()
 
-# Função para carregar dados com tratamento robusto
+# Função para obter a planilha (não cacheada pois o client já é cacheado)
+def get_spreadsheet():
+    client = get_gspread_client()
+    return client.open_by_key(SPREADSHEET_ID)
+
+# Função para carregar dados
 @st.cache_data(ttl=300)
-def carregar_dados(spreadsheet, sheet_name):
+def carregar_dados(_spreadsheet, sheet_name):
     try:
-        worksheet = spreadsheet.worksheet(sheet_name)
+        worksheet = _spreadsheet.worksheet(sheet_name)
         records = worksheet.get_all_records()
         
         if not records:
@@ -73,32 +77,30 @@ def carregar_dados(spreadsheet, sheet_name):
         st.error(f"Erro ao carregar {sheet_name}: {str(e)}")
         return pd.DataFrame()
 
-# Função para salvar dados com validação
-def salvar_dados(spreadsheet, sheet_name, df):
+# Função para salvar dados
+def salvar_dados(_spreadsheet, sheet_name, df):
     try:
-        # Validação básica
         if df.empty:
             st.warning("Nenhum dado para salvar!")
             return False
             
-        worksheet = spreadsheet.worksheet(sheet_name)
+        worksheet = _spreadsheet.worksheet(sheet_name)
         worksheet.clear()
         
-        # Converter DataFrame mantendo tipos de dados
         dados = df.fillna('').astype(str).values.tolist()
         worksheet.update([df.columns.tolist()] + dados)
-        st.cache_data.clear()  # Limpa cache para forçar recarregamento
+        st.cache_data.clear()
         return True
     except Exception as e:
         st.error(f"Erro ao salvar em {sheet_name}: {str(e)}")
         return False
 
-# Função para verificar horários disponíveis com cache
+# Função para verificar horários disponíveis
 @st.cache_data(ttl=60)
-def verificar_horarios_disponiveis(spreadsheet, data_selecionada):
+def verificar_horarios_disponiveis(_spreadsheet, data_selecionada):
     try:
-        df_config = carregar_dados(spreadsheet, "Configuracoes")
-        df_agendamentos = carregar_dados(spreadsheet, "Agendamentos")
+        df_config = carregar_dados(_spreadsheet, "Configuracoes")
+        df_agendamentos = carregar_dados(_spreadsheet, "Agendamentos")
         
         if df_config.empty or df_agendamentos.empty:
             return df_config['Horarios'].dropna().unique().tolist()
@@ -120,7 +122,7 @@ def verificar_horarios_disponiveis(spreadsheet, data_selecionada):
 # Interface principal
 def main():
     st.title("✂️ Painel de Retaguarda - Barbearia")
-    spreadsheet = conectar_google_sheets()
+    spreadsheet = get_spreadsheet()
     
     # Carregar dados iniciais
     df_config = carregar_dados(spreadsheet, "Configuracoes")
@@ -271,7 +273,7 @@ def main():
                                 datetime.now().strftime('%d/%m/%Y %H:%M:%S')
                             ]
                             worksheet.append_row(novo_agendamento)
-                            st.cache_data.clear()  # Limpa cache de agendamentos
+                            st.cache_data.clear()
                             
                             st.success("Agendamento realizado com sucesso!")
                             st.rerun()
@@ -298,7 +300,7 @@ def main():
             with col2:
                 filtro_servico = st.selectbox(
                     "Filtrar por serviço",
-                    options=['Todos'] + sorted(df_agendamentos['Serviço'].astype(str).unique().tolist()))
+                    options=['Todos'] + sorted(df_agendamentos['Serviço'].astype(str).unique().tolist())
                 
             # Aplicar filtros
             df_filtrado = df_agendamentos.copy()
@@ -325,12 +327,9 @@ def main():
                 
                 if st.button("Remover Agendamento"):
                     try:
-                        # Obter o índice real na planilha
                         id_para_remover = df_filtrado.iloc[indice].name + 2
-                        
-                        # Remover agendamento
                         spreadsheet.worksheet("Agendamentos").delete_rows(id_para_remover)
-                        st.cache_data.clear()  # Limpa cache de agendamentos
+                        st.cache_data.clear()
                         
                         st.success("Agendamento removido com sucesso!")
                         st.rerun()
