@@ -6,6 +6,10 @@ from datetime import datetime, timedelta
 import numpy as np
 
 # Configurações do Google Sheets
+# Converte o dicionário em JSON
+creds_dict = st.secrets["gcp_service_account"]
+creds_json = json.dumps(creds_dict)
+
 SPREADSHEET_ID = "1z0vz0WecZAgZp7PkV3zsx3HHXBv6W_fUEtuDrniY5Jk"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
           "https://www.googleapis.com/auth/drive"]
@@ -15,7 +19,7 @@ MAX_AGENDAMENTOS_POR_HORARIO = 1  # Quantidade máxima de clientes no mesmo hor�
 
 # Função para conectar ao Google Sheets
 def conectar_google_sheets():
-    creds = ServiceAccountCredentials.from_json_keyfile_name("teste.json", SCOPES)
+    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_dict, SCOPES)
     client = gspread.authorize(creds)
     return client.open_by_key(SPREADSHEET_ID)
 

@@ -6,6 +6,9 @@ from oauth2client.service_account import ServiceAccountCredentials
 import urllib.parse
 import base64
 
+creds_dict = st.secrets["gcp_service_account"]
+creds_json = json.dumps(creds_dict)
+
 # Configurações do Google Sheets
 SPREADSHEET_ID = "1z0vz0WecZAgZp7PkV3zsx3HHXBv6W_fUEtuDrniY5Jk"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
@@ -13,7 +16,7 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
 
 # Função para conectar ao Google Sheets
 def conectar_google_sheets():
-    creds = ServiceAccountCredentials.from_json_keyfile_name("teste.json", SCOPES)
+    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_dict, SCOPES)
     client = gspread.authorize(creds)
     return client.open_by_key(SPREADSHEET_ID)
 
