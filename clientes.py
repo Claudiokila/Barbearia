@@ -204,7 +204,7 @@ set_bg_hack()
 # Conteúdo principal
 st.markdown("<div class='main'>", unsafe_allow_html=True)
 
-st.title("✂️ Agendamento de Corte")
+st.title("✂️BARBEARIA BOM GOSTO✂️")
 
 # Conectar ao Google Sheets
 spreadsheet = get_spreadsheet()
