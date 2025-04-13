@@ -212,31 +212,33 @@ if not config:
 
 # Formulário de agendamento
 with st.form("agendamento_form"):
-    col1,col2 = st.columns(2)
+    col1, col2 = st.columns(2)
     with col1:
-        nome = st.text_input("Nome completo*")
+        nome = st.text_input("Nome completo*", key="nome")
     with col2:
-        telefone = st.text_input("Telefone para contato* (com DDD)")    
+        telefone = st.text_input("Telefone para contato* (com DDD)", key="telefone")    
     
-    col3,col4,col5 = st.columns(3)
+    col3, col4, col5 = st.columns(3)
     with col3:
         # Seleção de serviço com preços
-        servico_info = st.selectbox("Serviço desejado:", options=config['servicos'], format_func=lambda x: f"{x[0]} - R${x[1]:.2f}")
+        servico_info = st.selectbox("Serviço desejado:", options=config['servicos'], format_func=lambda x: f"{x[0]} - R${x[1]:.2f}", key="servico")
         servico = servico_info[0]
         preco = servico_info[1]
     with col4:
         # Seleção de data
-        data_str = st.selectbox("Data disponível:", options=config['datas'], disabled=True)
+        data_str = st.selectbox("Data disponível:", options=config['datas'], disabled=True, key="data")
         data = datetime.strptime(data_str, "%d/%m/%Y").date()
 
     with col5:    
         # Seleção de horário
-        hora_str = st.selectbox("Horário disponível:", options=config['horarios'])
+        hora_str = st.selectbox("Horário disponível:", options=config['horarios'], key="hora")
         hora = datetime.strptime(hora_str, "%H:%M").time()
     
-    observacoes = st.text_area("Observações ou detalhes do corte")
+    observacoes = st.text_area("Observações ou detalhes do corte", key="observacoes")
     
-    if st.form_submit_button("Agendar Horário"):
+    submitted = st.form_submit_button("Agendar Horário")
+    
+    if submitted:
         if nome and telefone:
             # Preparar dados para salvar
             dados_agendamento = [
@@ -253,7 +255,7 @@ with st.form("agendamento_form"):
             if salvar_agendamento(spreadsheet, dados_agendamento):
                 # Remover o horário agendado da lista de disponíveis
                 if remover_horario_disponivel(spreadsheet, hora_str):
-                    st.success("Horário removido da lista de disponíveis com sucesso!")
+                    st.success("Horário agendado com sucesso!")
                 
                 # Mensagem para WhatsApp
                 mensagem = f"Olá, gostaria de confirmar meu agendamento:\n\n"
@@ -267,14 +269,14 @@ with st.form("agendamento_form"):
                 
                 whatsapp_url = f"https://wa.me/{WHATSAPP_NUMBER}?text={urllib.parse.quote(mensagem)}"
                 
-                st.success("Agendamento realizado com sucesso! Clique abaixo para confirmar pelo WhatsApp:")
-                
                 st.markdown(
                     f'<a href="{whatsapp_url}" class="whatsapp-btn" target="_blank">'
                     'Confirmar agendamento pelo WhatsApp'
                     '</a>',
                     unsafe_allow_html=True
                 )
+            else:
+                st.error("Ocorreu um erro ao salvar o agendamento. Por favor, tente novamente.")
         else:
             st.error("Por favor, preencha pelo menos o nome e telefone.")
 
