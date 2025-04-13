@@ -2,9 +2,18 @@ import streamlit as st
 from datetime import datetime
 import pandas as pd
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2 import service_account
 import urllib.parse
 import base64
+
+# Configuração da página DEVE ser a primeira coisa
+st.set_page_config(
+    page_title="Agendamento de Corte",
+    page_icon="✂️",
+    layout="centered"
+)
+
+# Estilos CSS
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -13,26 +22,37 @@ hide_streamlit_style = """
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-# Lê as credenciais do secrets
-creds_dict = st.secrets["gcp_service_account"]
 
-# Escopos de acesso
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
-          "https://www.googleapis.com/auth/drive"]
-
-# ID da planilha
+# CONSTANTES
 SPREADSHEET_ID = "1z0vz0WecZAgZp7PkV3zsx3HHXBv6W_fUEtuDrniY5Jk"
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
 
-# Função para conectar ao Google Sheets
-def conectar_google_sheets():
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPES)
-    client = gspread.authorize(creds)
+# Função para conectar ao Google Sheets com cache
+@st.cache_resource(ttl=3600)
+def get_gspread_client():
+    try:
+        creds = service_account.Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=SCOPES
+        )
+        return gspread.authorize(creds)
+    except Exception as e:
+        st.error(f"Erro ao conectar ao Google Sheets: {str(e)}")
+        st.stop()
+
+# Função para obter a planilha
+def get_spreadsheet():
+    client = get_gspread_client()
     return client.open_by_key(SPREADSHEET_ID)
 
-# Função para carregar configurações
-def carregar_configuracoes(spreadsheet):
+# Função para carregar configurações com cache
+@st.cache_data(ttl=300)
+def carregar_configuracoes(_spreadsheet):
     try:
-        worksheet = spreadsheet.worksheet("Configuracoes")
+        worksheet = _spreadsheet.worksheet("Configuracoes")
         records = worksheet.get_all_records()
         
         horarios = [str(r['Horarios']) for r in records if 'Horarios' in r and r['Horarios']]
@@ -42,7 +62,10 @@ def carregar_configuracoes(spreadsheet):
         for r in records:
             if 'Servicos' in r and 'Precos' in r and r['Servicos'] and r['Precos']:
                 servicos.append(r['Servicos'])
-                precos.append(float(r['Precos']))
+                try:
+                    precos.append(float(r['Precos']))
+                except ValueError:
+                    continue
         
         datas = [str(r['Datas']) for r in records if 'Datas' in r and r['Datas']]
         
@@ -56,42 +79,35 @@ def carregar_configuracoes(spreadsheet):
         return None
 
 # Função para salvar agendamento
-def salvar_agendamento(spreadsheet, dados):
+def salvar_agendamento(_spreadsheet, dados):
     try:
-        worksheet = spreadsheet.worksheet("Agendamentos")
+        worksheet = _spreadsheet.worksheet("Agendamentos")
         worksheet.append_row(dados)
+        st.cache_data.clear()  # Limpa cache de configurações
         return True
     except Exception as e:
         st.error(f"Erro ao salvar agendamento: {str(e)}")
         return False
 
-# Função para remover horário agendado da lista de disponíveis
-def remover_horario_disponivel(spreadsheet, hora_agendada):
+# Função para remover horário agendado
+def remover_horario_disponivel(_spreadsheet, hora_agendada):
     try:
-        worksheet = spreadsheet.worksheet("Configuracoes")
+        worksheet = _spreadsheet.worksheet("Configuracoes")
         records = worksheet.get_all_records()
         
-        # Encontrar todas as linhas que contêm o horário agendado
         rows_to_delete = []
-        for i, r in enumerate(records, start=2):  # start=2 porque a planilha começa na linha 2 (linha 1 é cabeçalho)
+        for i, r in enumerate(records, start=2):
             if 'Horarios' in r and str(r['Horarios']) == hora_agendada:
                 rows_to_delete.append(i)
         
-        # Remover as linhas encontradas (de trás para frente para não afetar os índices)
         for row_num in sorted(rows_to_delete, reverse=True):
             worksheet.delete_rows(row_num)
             
+        st.cache_data.clear()  # Limpa cache de configurações
         return True
     except Exception as e:
         st.error(f"Erro ao remover horário disponível: {str(e)}")
         return False
-
-# Configuração da página
-st.set_page_config(
-    page_title="Agendamento de Corte",
-    page_icon="✂️",
-    layout="centered"
-)
 
 # Função para adicionar background
 def set_bg_hack():
@@ -194,7 +210,7 @@ st.markdown("<div class='main'>", unsafe_allow_html=True)
 st.title("✂️ Agendamento de Corte")
 
 # Conectar ao Google Sheets
-spreadsheet = conectar_google_sheets()
+spreadsheet = get_spreadsheet()
 
 # Carregar configurações
 config = carregar_configuracoes(spreadsheet)
@@ -205,25 +221,25 @@ if not config:
 
 # Formulário de agendamento
 with st.form("agendamento_form"):
-    col1,col2 = st.columns(2)
+    col1, col2 = st.columns(2)
     with col1:
         nome = st.text_input("Nome completo*")
     with col2:
         telefone = st.text_input("Telefone para contato* (com DDD)")    
     
-    col3,col4,col5 = st.columns(3)
+    col3, col4, col5 = st.columns(3)
     with col3:
-        # Seleção de serviço com preços
-        servico_info = st.selectbox("Serviço desejado:", options=config['servicos'], format_func=lambda x: f"{x[0]} - R${x[1]:.2f}")
+        servico_info = st.selectbox(
+            "Serviço desejado:", 
+            options=config['servicos'], 
+            format_func=lambda x: f"{x[0]} - R${x[1]:.2f}"
+        )
         servico = servico_info[0]
         preco = servico_info[1]
     with col4:
-        # Seleção de data
         data_str = st.selectbox("Data disponível:", options=config['datas'], disabled=True)
         data = datetime.strptime(data_str, "%d/%m/%Y").date()
-
     with col5:    
-        # Seleção de horário
         hora_str = st.selectbox("Horário disponível:", options=config['horarios'])
         hora = datetime.strptime(hora_str, "%H:%M").time()
     
@@ -231,7 +247,6 @@ with st.form("agendamento_form"):
     
     if st.form_submit_button("Agendar Horário"):
         if nome and telefone:
-            # Preparar dados para salvar
             dados_agendamento = [
                 data.strftime('%d/%m/%Y'),
                 hora.strftime('%H:%M'),
@@ -244,11 +259,9 @@ with st.form("agendamento_form"):
             ]
             
             if salvar_agendamento(spreadsheet, dados_agendamento):
-                # Remover o horário agendado da lista de disponíveis
                 if remover_horario_disponivel(spreadsheet, hora_str):
                     st.success("Horário removido da lista de disponíveis com sucesso!")
                 
-                # Mensagem para WhatsApp
                 mensagem = f"Olá, gostaria de confirmar meu agendamento:\n\n"
                 mensagem += f"*Nome:* {nome}\n"
                 mensagem += f"*Serviço:* {servico} (R${preco:.2f})\n"
@@ -275,4 +288,4 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 # Rodapé
 st.markdown("---")
-st.caption("© 2023 Barbearia Style - Todos os direitos reservados")
+st.caption(f"© {datetime.now().year} Barbearia Style - Todos os direitos reservados")
