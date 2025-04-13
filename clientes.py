@@ -81,12 +81,6 @@ def remover_horario_disponivel(spreadsheet, hora_agendada):
         st.error(f"Erro ao remover horário disponível: {str(e)}")
         return False
 
-# Configuração da página
-st.set_page_config(
-    page_title="Agendamento de Corte",
-    page_icon="✂️",
-    layout="centered"
-)
 
 # Função para adicionar background
 def set_bg_hack():
