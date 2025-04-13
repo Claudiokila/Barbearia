@@ -300,7 +300,7 @@ def main():
             with col2:
                 filtro_servico = st.selectbox(
                     "Filtrar por serviço",
-                    options=['Todos'] + sorted(df_agendamentos['Serviço'].astype(str).unique().tolist())
+                    options=['Todos'] + sorted(df_agendamentos['Serviço'].astype(str).unique().tolist()))
                 
             # Aplicar filtros
             df_filtrado = df_agendamentos.copy()
