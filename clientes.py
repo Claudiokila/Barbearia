@@ -23,6 +23,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
+WHATSAPP_NUMBER = "5511958886366"  # Número fixo para onde os agendamentos devem ser enviados
 
 # Função para conectar ao Google Sheets
 @st.cache_resource(ttl=3600)
@@ -257,19 +258,19 @@ with st.form("agendamento_form"):
                 # Mensagem para WhatsApp
                 mensagem = f"Olá, gostaria de confirmar meu agendamento:\n\n"
                 mensagem += f"*Nome:* {nome}\n"
+                mensagem += f"*Telefone:* {telefone}\n"
                 mensagem += f"*Serviço:* {servico} (R${preco:.2f})\n"
                 mensagem += f"*Data:* {data.strftime('%d/%m/%Y')}\n"
                 mensagem += f"*Horário:* {hora.strftime('%H:%M')}\n"
                 if observacoes:
                     mensagem += f"*Observações:* {observacoes}\n"
                 
-                telefone_limpo = ''.join(filter(str.isdigit, telefone))
-                whatsapp_url = f"https://wa.me/55{telefone_limpo}?text={urllib.parse.quote(mensagem)}"
+                whatsapp_url = f"https://wa.me/{WHATSAPP_NUMBER}?text={urllib.parse.quote(mensagem)}"
                 
                 st.success("Agendamento realizado com sucesso! Clique abaixo para confirmar pelo WhatsApp:")
                 
                 st.markdown(
-                    f'<a href="{https://wa.me/5511958886366}" class="whatsapp-btn" target="_blank">'
+                    f'<a href="{whatsapp_url}" class="whatsapp-btn" target="_blank">'
                     'Confirmar agendamento pelo WhatsApp'
                     '</a>',
                     unsafe_allow_html=True
