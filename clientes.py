@@ -1,12 +1,4 @@
 import streamlit as st
-
-# Configuração da página DEVE ser a primeira coisa
-st.set_page_config(
-    page_title="Agendamento de Corte",
-    page_icon="✂️",
-    layout="centered"
-)
-
 # Agora o resto do código
 from datetime import datetime
 import pandas as pd
