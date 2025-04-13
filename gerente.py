@@ -5,6 +5,16 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
 import numpy as np
 
+hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+
 # Lê as credenciais do secrets
 creds_dict = st.secrets["gcp_service_account"]
 
