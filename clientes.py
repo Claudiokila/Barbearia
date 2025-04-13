@@ -269,7 +269,7 @@ with st.form("agendamento_form"):
                 st.success("Agendamento realizado com sucesso! Clique abaixo para confirmar pelo WhatsApp:")
                 
                 st.markdown(
-                    f'<a href="{whatsapp_url}" class="whatsapp-btn" target="_blank">'
+                    f'<a href="{https://wa.me/5511958886366}" class="whatsapp-btn" target="_blank">'
                     'Confirmar agendamento pelo WhatsApp'
                     '</a>',
                     unsafe_allow_html=True
