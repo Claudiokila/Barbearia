@@ -1,19 +1,21 @@
-# Todas as imports DEVEM vir depois da configuração da página
-def main():
-    import streamlit as st
-    st.set_page_config(
-        page_title="Agendamento de Corte",
-        page_icon="✂️",
-        layout="centered"
-    )
-    
-    # Agora o resto do código
-    from datetime import datetime
-    import pandas as pd
-    import gspread
-    from google.oauth2 import service_account
-    import urllib.parse
-    import base64
+# NÃO ADICIONE NADA ANTES DESTA LINHA - NEM IMPORTS, NEM COMENTÁRIOS!
+import streamlit as st
+st.set_page_config(
+    page_title="Agendamento de Corte",
+    page_icon="✂️",
+    layout="centered"
+)
+
+# SÓ AQUI IMPORTE OUTRAS BIBLIOTECAS
+from datetime import datetime
+import pandas as pd
+import gspread
+from google.oauth2 import service_account
+import urllib.parse
+import base64
+
+# O RESTO DO SEU CÓDIGO CONTINUA AQUI...
+# [todo o restante do seu código original]
 
     # CONSTANTES
     SPREADSHEET_ID = "1z0vz0WecZAgZp7PkV3zsx3HHXBv6W_fUEtuDrniY5Jk"
