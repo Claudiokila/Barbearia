@@ -2,7 +2,7 @@ import streamlit as st
 from datetime import datetime
 import pandas as pd
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2 import service_account
 import urllib.parse
 import base64
 
@@ -25,18 +25,22 @@ SCOPES = [
 ]
 
 # Função para conectar ao Google Sheets
-def conectar_google_sheets():
+@st.cache_resource(ttl=3600)
+def get_gspread_client():
     try:
-        # Carrega as credenciais do arquivo JSON (que deve estar no mesmo diretório)
-        creds = ServiceAccountCredentials.from_json_keyfile_name(
-            "credenciais.json", SCOPES
+        creds = service_account.Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=SCOPES
         )
-        client = gspread.authorize(creds)
-        spreadsheet = client.open_by_key(SPREADSHEET_ID)
-        return spreadsheet
+        return gspread.authorize(creds)
     except Exception as e:
         st.error(f"Erro ao conectar ao Google Sheets: {str(e)}")
-        return None
+        st.stop()
+
+# Função para obter a planilha (não cacheada pois o client já é cacheado)
+def get_spreadsheet():
+    client = get_gspread_client()
+    return client.open_by_key(SPREADSHEET_ID)
 
 # Função para carregar configurações
 def carregar_configuracoes(spreadsheet):
@@ -196,11 +200,7 @@ st.markdown("<div class='main'>", unsafe_allow_html=True)
 st.title("✂️ Agendamento de Corte")
 
 # Conectar ao Google Sheets
-spreadsheet = conectar_google_sheets()
-
-if spreadsheet is None:
-    st.error("Erro ao conectar ao Google Sheets. Por favor, tente novamente mais tarde.")
-    st.stop()
+spreadsheet = get_spreadsheet()
 
 # Carregar configurações
 config = carregar_configuracoes(spreadsheet)
