@@ -6,14 +6,23 @@ from google.oauth2 import service_account
 import urllib.parse
 import base64
 
+import streamlit as st
+
 hide_streamlit_style = """
     <style>
-    [data-testid="stToolbar"] {visibility: hidden;}
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
     footer {visibility: hidden;}
-    .css-18e3th9 {visibility: hidden;}
+    
+    /* Esconde qualquer imagem SVG dentro do footer */
+    footer svg {
+        display: none;
+    }
     </style>
 """
+
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 
 
 
