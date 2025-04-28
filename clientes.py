@@ -51,7 +51,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-WHATSAPP_NUMBER = "5511958886366"  # Número fixo para onde os agendamentos devem ser enviados
+WHATSAPP_NUMBER = "558599339802"  # Número fixo para onde os agendamentos devem ser enviados
 
 # Função para conectar ao Google Sheets
 @st.cache_resource(ttl=3600)
@@ -324,4 +324,4 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 # Rodapé
 st.markdown("---")
-st.caption("© 2023 Barbearia Style - Todos os direitos reservados")
+st.caption("© 2023 CB MAIS - Todos os direitos reservados")
