@@ -10,29 +10,35 @@ import streamlit as st
 
 hide_streamlit_style = """
     <style>
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    
-    /* Ocultar o botão do Streamlit Cloud */
+    #MainMenu, header, footer {visibility: hidden; height: 0px;}
+
+    /* Forçar ocultação do badge do Streamlit Cloud */
     .stDeployButton {
-        visibility: hidden;
-        height: 0%;
-        width: 0%;
-        display: none;
+        display: none !important;
+        visibility: hidden !important;
+    }
+    
+    [data-testid="stDeployButton"] {
+        display: none !important;
+        visibility: hidden !important;
     }
 
-    /* Algumas versões novas usam data-testid */
-    [data-testid="stDeployButton"] {
-        visibility: hidden;
-        height: 0%;
-        width: 0%;
-        display: none;
+    /* Forçar ocultar o container inteiro que carrega esse botão */
+    a[href^="https://streamlit.io/cloud"] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    /* Se existir um div container específico */
+    div[class*="viewerBadge"] {
+        display: none !important;
+        visibility: hidden !important;
     }
     </style>
 """
 
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 
 
 
