@@ -261,7 +261,7 @@ with st.form("agendamento_form"):
     col3, col4, col5 = st.columns(3)
     with col3:
         # Seleção de serviço com preços
-        servico_info = st.selectbox("Serviço desejado A partir de:", options=config['servicos'], format_func=lambda x: f"{x[0]} - R${x[1]:.2f}", key="servico")
+        servico_info = st.selectbox("Serviço desejado:", options=config['servicos'], format_func=lambda x: f"{x[0]} - R${x[1]:.2f}", key="servico")
         servico = servico_info[0]
         preco = servico_info[1]
     with col4:
