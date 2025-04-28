@@ -14,14 +14,26 @@ hide_streamlit_style = """
     header {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* Esconde qualquer imagem SVG dentro do footer */
-    footer svg {
+    /* Ocultar o botão do Streamlit Cloud */
+    .stDeployButton {
+        visibility: hidden;
+        height: 0%;
+        width: 0%;
+        display: none;
+    }
+
+    /* Algumas versões novas usam data-testid */
+    [data-testid="stDeployButton"] {
+        visibility: hidden;
+        height: 0%;
+        width: 0%;
         display: none;
     }
     </style>
 """
 
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 
 
 
