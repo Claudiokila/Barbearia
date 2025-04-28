@@ -8,15 +8,13 @@ import base64
 
 hide_streamlit_style = """
     <style>
-    #MainMenu {visibility: hidden;}
+    [data-testid="stToolbar"] {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
+    .css-18e3th9 {visibility: hidden;}
     </style>
 """
-
-# Depois você precisa usar no seu código Streamlit:
-import streamlit as st
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 
 
 # CONSTANTES
