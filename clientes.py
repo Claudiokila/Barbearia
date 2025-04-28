@@ -266,7 +266,7 @@ with st.form("agendamento_form"):
         preco = servico_info[1]
     with col4:
         # Seleção de data
-        data_str = st.selectbox("Data disponível:", options=config['datas'], disabled=True, key="data")
+        data_str = st.selectbox("Data disponível:", options=config['datas'], key="data")
         data = datetime.strptime(data_str, "%d/%m/%Y").date()
 
     with col5:    
