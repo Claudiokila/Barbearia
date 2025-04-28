@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import numpy as np
 from google.oauth2 import service_account
 import time
+from gspread.exceptions import APIError
 
 # Configuração da página DEVE ser a primeira coisa
 st.set_page_config(
@@ -80,18 +81,29 @@ def get_gspread_client():
 
 # Função para obter a planilha
 def get_spreadsheet():
-    client = get_gspread_client()
-    return client.open_by_key(SPREADSHEET_ID)
+    try:
+        client = get_gspread_client()
+        return client.open_by_key(SPREADSHEET_ID)
+    except APIError as e:
+        st.error(f"Erro ao acessar a planilha: {str(e)}")
+        st.error("Verifique se a planilha existe e se a conta de serviço tem permissão")
+        st.stop()
 
 # Função para parsear datas
 def parse_date(date_str):
     try:
-        return datetime.strptime(date_str, '%d/%m/%Y').date()
+        if isinstance(date_str, datetime):
+            return date_str.date()
+        if isinstance(date_str, pd.Timestamp):
+            return date_str.date()
+        return datetime.strptime(str(date_str), '%d/%m/%Y').date()
     except:
-        return None
+        try:
+            return datetime.strptime(str(date_str), '%Y-%m-%d').date()
+        except:
+            return None
 
 # Função para carregar dados com verificação robusta
-@st.cache_data(ttl=300)
 def carregar_dados(_spreadsheet, sheet_name):
     try:
         worksheet = _spreadsheet.worksheet(sheet_name)
@@ -138,6 +150,8 @@ def salvar_dados(_spreadsheet, sheet_name, df):
         for col in df.columns:
             if pd.api.types.is_datetime64_any_dtype(df[col]):
                 df[col] = df[col].dt.strftime('%d/%m/%Y')
+            elif isinstance(df[col].iloc[0], date):
+                df[col] = df[col].apply(lambda x: x.strftime('%d/%m/%Y'))
         
         dados = df.fillna('').astype(str).values.tolist()
         worksheet.update([df.columns.tolist()] + dados)
@@ -148,23 +162,28 @@ def salvar_dados(_spreadsheet, sheet_name, df):
         return False
 
 # Função para verificar horários disponíveis
-@st.cache_data(ttl=60)
 def verificar_horarios_disponiveis(_spreadsheet, data_selecionada):
     try:
         df_config = carregar_dados(_spreadsheet, "Configuracoes")
         df_agendamentos = carregar_dados(_spreadsheet, "Agendamentos")
         
-        if df_config.empty or df_agendamentos.empty:
-            return df_config['Horarios'].dropna().unique().tolist()
+        if df_config.empty:
+            return []
         
         todos_horarios = df_config['Horarios'].dropna().unique().tolist()
         
-        # Converter para string para comparação
-        data_str = parse_date(data_selecionada)
-        if data_str:
-            data_str = data_str.strftime('%d/%m/%Y')
+        if df_agendamentos.empty:
+            return todos_horarios
         
-        agendamentos_data = df_agendamentos[df_agendamentos['Data'].astype(str) == data_str]
+        # Converter para string para comparação
+        data_selecionada_dt = parse_date(data_selecionada)
+        if not data_selecionada_dt:
+            return todos_horarios
+        
+        # Converter todas as datas no DataFrame para comparar
+        df_agendamentos['Data_Comparacao'] = df_agendamentos['Data'].apply(parse_date)
+        agendamentos_data = df_agendamentos[df_agendamentos['Data_Comparacao'] == data_selecionada_dt]
+        
         contagem_horarios = agendamentos_data['Hora'].value_counts().to_dict()
         
         return [
@@ -178,10 +197,7 @@ def verificar_horarios_disponiveis(_spreadsheet, data_selecionada):
         return []
 
 # Função para verificar consistência
-def verificar_consistencia():
-    spreadsheet = get_spreadsheet()
-    df_agendamentos = carregar_dados(spreadsheet, "Agendamentos")
-    
+def verificar_consistencia(df_agendamentos):
     st.subheader("Verificação de Consistência")
     
     # Verificar dados faltantes
@@ -191,8 +207,9 @@ def verificar_consistencia():
     
     # Verificar datas inválidas
     st.write("### Datas Inválidas")
-    invalid_dates = df_agendamentos[df_agendamentos['Data'].isna()]
-    st.write(invalid_dates)
+    df_agendamentos['Data_Validada'] = df_agendamentos['Data'].apply(parse_date)
+    invalid_dates = df_agendamentos[df_agendamentos['Data_Validada'].isna()]
+    st.write(invalid_dates[['Data', 'Hora', 'Nome']])
     
     # Verificar duplicatas
     st.write("### Agendamentos Duplicados")
@@ -228,6 +245,7 @@ def main():
         }
         df_config = pd.DataFrame(dados_padrao)
         salvar_dados(spreadsheet, "Configuracoes", df_config)
+        df_config = carregar_dados(spreadsheet, "Configuracoes")  # Recarregar após salvar
     
     # Abas do painel
     tab1, tab2, tab3, tab4 = st.tabs(["Configurações", "Agendamentos", "Relatórios", "Depuração"])
@@ -375,13 +393,18 @@ def main():
         st.subheader("Agendamentos Existentes")
         
         if not df_agendamentos.empty:
+            # Converter datas para exibição
+            df_agendamentos['Data_Exibicao'] = df_agendamentos['Data'].apply(
+                lambda x: x.strftime('%d/%m/%Y') if isinstance(x, (datetime, pd.Timestamp)) else str(x)
+            )
+            
             # Filtros
             col1, col2 = st.columns(2)
             
             with col1:
                 filtro_data = st.selectbox(
                     "Filtrar por data",
-                    options=['Todas'] + sorted(df_agendamentos['Data'].astype(str).unique().tolist())
+                    options=['Todas'] + sorted(df_agendamentos['Data_Exibicao'].unique().tolist())
                 )
             
             with col2:
@@ -392,7 +415,7 @@ def main():
             # Aplicar filtros
             df_filtrado = df_agendamentos.copy()
             if filtro_data != 'Todas':
-                df_filtrado = df_filtrado[df_filtrado['Data'].astype(str) == filtro_data]
+                df_filtrado = df_filtrado[df_filtrado['Data_Exibicao'] == filtro_data]
             if filtro_servico != 'Todos':
                 df_filtrado = df_filtrado[df_filtrado['Serviço'].astype(str) == filtro_servico]
             
@@ -401,13 +424,14 @@ def main():
                 st.write(f"**Total de agendamentos:** {len(df_filtrado)}")
                 
                 for _, row in df_filtrado.sort_values(['Data', 'Hora']).iterrows():
+                    data_exibicao = row['Data_Exibicao'] if 'Data_Exibicao' in row else str(row['Data'])
                     with st.container():
                         st.markdown(
                             f"""
                             <div class="agendamento-card">
                                 <h4>{row['Nome']}</h4>
                                 <p><span class="horario-tag">{row['Hora']}</span> <span class="servico-tag">{row['Serviço']}</span></p>
-                                <p><strong>Data:</strong> {row['Data']}</p>
+                                <p><strong>Data:</strong> {data_exibicao}</p>
                                 <p><strong>Telefone:</strong> {row['Telefone']}</p>
                                 <p><strong>Preço:</strong> R$ {row['Preco']:.2f}</p>
                                 <p><strong>Observações:</strong> {row.get('Observacoes', 'Nenhuma')}</p>
@@ -421,7 +445,7 @@ def main():
             # Remoção de agendamento
             st.subheader("Remover Agendamento")
             opcoes = [
-                f"{row['Data']} {row['Hora']} - {row['Nome']} ({row['Serviço']})"
+                f"{row['Data_Exibicao']} {row['Hora']} - {row['Nome']} ({row['Serviço']})"
                 for _, row in df_filtrado.iterrows()
             ]
             
@@ -452,6 +476,9 @@ def main():
         df_agendamentos = carregar_dados(spreadsheet, "Agendamentos")
         
         if not df_agendamentos.empty:
+            # Converter datas para análise
+            df_agendamentos['Data_Analise'] = df_agendamentos['Data'].apply(parse_date)
+            
             # Métricas
             st.subheader("Métricas")
             col1, col2, col3 = st.columns(3)
@@ -473,8 +500,8 @@ def main():
             
             st.subheader("Faturamento por Data")
             try:
-                df_agendamentos['Data'] = pd.to_datetime(df_agendamentos['Data'], dayfirst=True)
-                st.line_chart(df_agendamentos.groupby('Data')['Preco'].sum())
+                df_agendamentos['Data_Analise'] = pd.to_datetime(df_agendamentos['Data_Analise'])
+                st.line_chart(df_agendamentos.groupby('Data_Analise')['Preco'].sum())
             except:
                 st.warning("Não foi possível gerar gráfico de faturamento")
             
@@ -505,7 +532,8 @@ def main():
         else:
             st.warning("Dados de agendamentos não carregados")
         
-        verificar_consistencia()
+        if not df_agendamentos.empty:
+            verificar_consistencia(df_agendamentos)
     
     st.markdown("---")
     st.caption(f"© {datetime.now().year} Barbearia Style - Painel Administrativo")
