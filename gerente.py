@@ -4,6 +4,7 @@ import gspread
 from datetime import datetime, timedelta
 import numpy as np
 from google.oauth2 import service_account
+import time
 
 # Configuração da página DEVE ser a primeira coisa
 st.set_page_config(
@@ -77,12 +78,19 @@ def get_gspread_client():
         st.error(f"Erro ao conectar ao Google Sheets: {str(e)}")
         st.stop()
 
-# Função para obter a planilha (não cacheada pois o client já é cacheado)
+# Função para obter a planilha
 def get_spreadsheet():
     client = get_gspread_client()
     return client.open_by_key(SPREADSHEET_ID)
 
-# Função para carregar dados
+# Função para parsear datas
+def parse_date(date_str):
+    try:
+        return datetime.strptime(date_str, '%d/%m/%Y').date()
+    except:
+        return None
+
+# Função para carregar dados com verificação robusta
 @st.cache_data(ttl=300)
 def carregar_dados(_spreadsheet, sheet_name):
     try:
@@ -94,6 +102,9 @@ def carregar_dados(_spreadsheet, sheet_name):
         
         df = pd.DataFrame(records)
         
+        # Debug: Mostrar dados brutos
+        st.session_state[f'debug_{sheet_name}'] = df.copy()
+        
         # Tratamento especial para cada aba
         if sheet_name == "Configuracoes":
             if 'Precos' in df.columns:
@@ -102,6 +113,8 @@ def carregar_dados(_spreadsheet, sheet_name):
         elif sheet_name == "Agendamentos":
             if 'Preco' in df.columns:
                 df['Preco'] = pd.to_numeric(df['Preco'], errors='coerce')
+            if 'Data' in df.columns:
+                df['Data'] = df['Data'].apply(parse_date)
             if 'Data_Registro' in df.columns:
                 df['Data_Registro'] = pd.to_datetime(df['Data_Registro'], dayfirst=True, errors='coerce')
         
@@ -120,6 +133,11 @@ def salvar_dados(_spreadsheet, sheet_name, df):
             
         worksheet = _spreadsheet.worksheet(sheet_name)
         worksheet.clear()
+        
+        # Converter datas para string antes de salvar
+        for col in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
+                df[col] = df[col].dt.strftime('%d/%m/%Y')
         
         dados = df.fillna('').astype(str).values.tolist()
         worksheet.update([df.columns.tolist()] + dados)
@@ -140,7 +158,13 @@ def verificar_horarios_disponiveis(_spreadsheet, data_selecionada):
             return df_config['Horarios'].dropna().unique().tolist()
         
         todos_horarios = df_config['Horarios'].dropna().unique().tolist()
-        agendamentos_data = df_agendamentos[df_agendamentos['Data'] == data_selecionada]
+        
+        # Converter para string para comparação
+        data_str = parse_date(data_selecionada)
+        if data_str:
+            data_str = data_str.strftime('%d/%m/%Y')
+        
+        agendamentos_data = df_agendamentos[df_agendamentos['Data'].astype(str) == data_str]
         contagem_horarios = agendamentos_data['Hora'].value_counts().to_dict()
         
         return [
@@ -153,9 +177,37 @@ def verificar_horarios_disponiveis(_spreadsheet, data_selecionada):
         st.error(f"Erro ao verificar horários: {str(e)}")
         return []
 
+# Função para verificar consistência
+def verificar_consistencia():
+    spreadsheet = get_spreadsheet()
+    df_agendamentos = carregar_dados(spreadsheet, "Agendamentos")
+    
+    st.subheader("Verificação de Consistência")
+    
+    # Verificar dados faltantes
+    st.write("### Dados Faltantes")
+    missing_data = df_agendamentos.isnull().sum()
+    st.write(missing_data)
+    
+    # Verificar datas inválidas
+    st.write("### Datas Inválidas")
+    invalid_dates = df_agendamentos[df_agendamentos['Data'].isna()]
+    st.write(invalid_dates)
+    
+    # Verificar duplicatas
+    st.write("### Agendamentos Duplicados")
+    duplicates = df_agendamentos[df_agendamentos.duplicated(subset=['Data', 'Hora', 'Nome'], keep=False)]
+    st.write(duplicates)
+
 # Interface principal
 def main():
     st.title("✂️ Painel de Retaguarda - Barbearia")
+    
+    # Botão de atualização manual
+    if st.button("Atualizar Dados (Forçar Recarregamento)"):
+        st.cache_data.clear()
+        st.rerun()
+    
     spreadsheet = get_spreadsheet()
     
     # Carregar dados iniciais
@@ -178,7 +230,7 @@ def main():
         salvar_dados(spreadsheet, "Configuracoes", df_config)
     
     # Abas do painel
-    tab1, tab2, tab3 = st.tabs(["Configurações", "Agendamentos", "Relatórios"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Configurações", "Agendamentos", "Relatórios", "Depuração"])
     
     with tab1:
         st.header("Configurações da Barbearia")
@@ -243,6 +295,7 @@ def main():
                     
                     if salvar_dados(spreadsheet, "Configuracoes", df_novo):
                         st.success("Configurações salvas com sucesso!")
+                        time.sleep(2)
                         st.rerun()
                 
                 except Exception as e:
@@ -310,6 +363,7 @@ def main():
                             st.cache_data.clear()
                             
                             st.success("Agendamento realizado com sucesso!")
+                            time.sleep(2)
                             st.rerun()
                     
                     except Exception as e:
@@ -319,7 +373,6 @@ def main():
         
         # Visualização de agendamentos
         st.subheader("Agendamentos Existentes")
-        df_agendamentos = carregar_dados(spreadsheet, "Agendamentos")
         
         if not df_agendamentos.empty:
             # Filtros
@@ -381,11 +434,12 @@ def main():
                 
                 if st.button("Remover Agendamento"):
                     try:
-                        id_para_remover = df_filtrado.iloc[indice].name + 2
+                        id_para_remover = df_filtrado.iloc[indice].name + 2  # +2 porque a planilha tem cabeçalho e índice começa em 1
                         spreadsheet.worksheet("Agendamentos").delete_rows(id_para_remover)
                         st.cache_data.clear()
                         
                         st.success("Agendamento removido com sucesso!")
+                        time.sleep(2)
                         st.rerun()
                     
                     except Exception as e:
@@ -435,6 +489,23 @@ def main():
             )
         else:
             st.info("Nenhum dado disponível para relatórios.")
+    
+    with tab4:
+        st.header("Depuração e Verificação")
+        
+        st.subheader("Dados Brutos - Configurações")
+        if 'debug_Configuracoes' in st.session_state:
+            st.write(st.session_state['debug_Configuracoes'])
+        else:
+            st.warning("Dados de configuração não carregados")
+        
+        st.subheader("Dados Brutos - Agendamentos")
+        if 'debug_Agendamentos' in st.session_state:
+            st.write(st.session_state['debug_Agendamentos'])
+        else:
+            st.warning("Dados de agendamentos não carregados")
+        
+        verificar_consistencia()
     
     st.markdown("---")
     st.caption(f"© {datetime.now().year} Barbearia Style - Painel Administrativo")
