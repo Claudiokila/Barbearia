@@ -6,7 +6,6 @@ from google.oauth2 import service_account
 import urllib.parse
 import base64
 
-# Estilos CSS
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -14,7 +13,11 @@ hide_streamlit_style = """
     header {visibility: hidden;}
     </style>
 """
+
+# Depois você precisa usar no seu código Streamlit:
+import streamlit as st
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 
 # CONSTANTES
 MAX_AGENDAMENTOS_POR_HORARIO = 1
