@@ -235,12 +235,13 @@ def main():
     if df_config.empty:
         dados_padrao = {
             'Horarios': ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'],
-            'Servicos': ['Corte', 'Barba', 'Corte + Barba', 'Sobrancelha', 'Pezinho'],
-            'Precos': [30.00, 20.00, 45.00, 10.00, 5.00],
+            'Servicos': ['Corte', 'Barba', 'Corte + Barba', 'Sobrancelha', 'Pezinho', None, None],
+            'Precos': [30.00, 20.00, 45.00, 10.00, 5.00, None, None],
             'Datas': [
                 datetime.now().strftime('%d/%m/%Y'),
                 (datetime.now() + timedelta(days=1)).strftime('%d/%m/%Y'),
-                (datetime.now() + timedelta(days=2)).strftime('%d/%m/%Y')
+                (datetime.now() + timedelta(days=2)).strftime('%d/%m/%Y'),
+                None, None, None, None
             ]
         }
         df_config = pd.DataFrame(dados_padrao)
