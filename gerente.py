@@ -231,23 +231,21 @@ def main():
     df_config = carregar_dados(spreadsheet, "Configuracoes")
     df_agendamentos = carregar_dados(spreadsheet, "Agendamentos")
     
-        # Dados padrão se a planilha estiver vazia
+    # Dados padrão se a planilha estiver vazia
     if df_config.empty:
         dados_padrao = {
-            'Horarios': ['09:00', '10:00', '11:00', '14:00', '15:00'],  # 5 horários
+            'Horarios': ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'],
             'Servicos': ['Corte', 'Barba', 'Corte + Barba', 'Sobrancelha', 'Pezinho'],
             'Precos': [30.00, 20.00, 45.00, 10.00, 5.00],
             'Datas': [
                 datetime.now().strftime('%d/%m/%Y'),
                 (datetime.now() + timedelta(days=1)).strftime('%d/%m/%Y'),
-                (datetime.now() + timedelta(days=2)).strftime('%d/%m/%Y'),
-                (datetime.now() + timedelta(days=3)).strftime('%d/%m/%Y'),
-                (datetime.now() + timedelta(days=4)).strftime('%d/%m/%Y')
+                (datetime.now() + timedelta(days=2)).strftime('%d/%m/%Y')
             ]
         }
         df_config = pd.DataFrame(dados_padrao)
         salvar_dados(spreadsheet, "Configuracoes", df_config)
-        df_config = carregar_dados(spreadsheet, "Configuracoes")
+        df_config = carregar_dados(spreadsheet, "Configuracoes")  # Recarregar após salvar
     
     # Abas do painel
     tab1, tab2, tab3, tab4 = st.tabs(["Configurações", "Agendamentos", "Relatórios", "Depuração"])
