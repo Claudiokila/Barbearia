@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import gspread
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 import numpy as np
 from google.oauth2 import service_account
 import time
@@ -130,10 +130,6 @@ def carregar_dados(_spreadsheet, sheet_name):
             if 'Data_Registro' in df.columns:
                 df['Data_Registro'] = pd.to_datetime(df['Data_Registro'], dayfirst=True, errors='coerce')
         
-        elif sheet_name == "Horarios_Por_Data":
-            if 'Data' in df.columns:
-                df['Data'] = df['Data'].apply(parse_date)
-        
         return df.replace('', np.nan).dropna(how='all')
     
     except Exception as e:
@@ -168,37 +164,32 @@ def salvar_dados(_spreadsheet, sheet_name, df):
 # Função para verificar horários disponíveis
 def verificar_horarios_disponiveis(_spreadsheet, data_selecionada):
     try:
-        df_horarios = carregar_dados(_spreadsheet, "Horarios_Por_Data")
+        df_config = carregar_dados(_spreadsheet, "Configuracoes")
         df_agendamentos = carregar_dados(_spreadsheet, "Agendamentos")
         
-        if df_horarios.empty:
+        if df_config.empty:
             return []
+        
+        todos_horarios = df_config['Horarios'].dropna().unique().tolist()
+        
+        if df_agendamentos.empty:
+            return todos_horarios
         
         # Converter para string para comparação
         data_selecionada_dt = parse_date(data_selecionada)
         if not data_selecionada_dt:
-            return []
+            return todos_horarios
         
-        # Obter horários para a data selecionada
-        horarios_data = df_horarios[df_horarios['Data'] == data_selecionada_dt]['Horarios'].values
-        if len(horarios_data) == 0:
-            return []
-        
-        horarios = horarios_data[0].split(',')
-        
-        if df_agendamentos.empty:
-            return horarios
-        
-        # Filtrar agendamentos para a data selecionada
+        # Converter todas as datas no DataFrame para comparar
         df_agendamentos['Data_Comparacao'] = df_agendamentos['Data'].apply(parse_date)
         agendamentos_data = df_agendamentos[df_agendamentos['Data_Comparacao'] == data_selecionada_dt]
         
         contagem_horarios = agendamentos_data['Hora'].value_counts().to_dict()
         
         return [
-            horario.strip() for horario in horarios
-            if horario.strip() not in contagem_horarios or 
-            contagem_horarios[horario.strip()] < MAX_AGENDAMENTOS_POR_HORARIO
+            horario for horario in todos_horarios
+            if horario not in contagem_horarios or 
+            contagem_horarios[horario] < MAX_AGENDAMENTOS_POR_HORARIO
         ]
     
     except Exception as e:
@@ -239,50 +230,65 @@ def main():
     # Carregar dados iniciais
     df_config = carregar_dados(spreadsheet, "Configuracoes")
     df_agendamentos = carregar_dados(spreadsheet, "Agendamentos")
-    df_horarios = carregar_dados(spreadsheet, "Horarios_Por_Data")
     
     # Dados padrão se a planilha estiver vazia
     if df_config.empty:
         dados_padrao = {
+            'Horarios': ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'],
             'Servicos': ['Corte', 'Barba', 'Corte + Barba', 'Sobrancelha', 'Pezinho'],
-            'Precos': [30.00, 20.00, 45.00, 10.00, 5.00]
+            'Precos': [30.00, 20.00, 45.00, 10.00, 5.00],
+            'Datas': [
+                datetime.now().strftime('%d/%m/%Y'),
+                (datetime.now() + timedelta(days=1)).strftime('%d/%m/%Y'),
+                (datetime.now() + timedelta(days=2)).strftime('%d/%m/%Y')
+            ]
         }
         df_config = pd.DataFrame(dados_padrao)
         salvar_dados(spreadsheet, "Configuracoes", df_config)
         df_config = carregar_dados(spreadsheet, "Configuracoes")  # Recarregar após salvar
     
-    if df_horarios.empty:
-        dados_padrao_horarios = {
-            'Data': [datetime.now().date(), (datetime.now() + timedelta(days=1)).date()],
-            'Horarios': [
-                '09:00,10:00,11:00,14:00,15:00,16:00,17:00',
-                '10:00,11:00,14:00,15:00,17:00'
-            ]
-        }
-        df_horarios = pd.DataFrame(dados_padrao_horarios)
-        salvar_dados(spreadsheet, "Horarios_Por_Data", df_horarios)
-        df_horarios = carregar_dados(spreadsheet, "Horarios_Por_Data")
-    
     # Abas do painel
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Configurações", "Horários", "Agendamentos", "Relatórios", "Depuração"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Configurações", "Agendamentos", "Relatórios", "Depuração"])
     
     with tab1:
         st.header("Configurações da Barbearia")
         with st.form("config_form"):
-            st.subheader("Serviços e Preços")
-            servicos_precos = st.text_area(
-                "Serviço:Preço (um por linha)", 
-                value="\n".join([
-                    f"{s}:{p}" for s, p in zip(
-                        df_config['Servicos'].dropna().astype(str).tolist(), 
-                        df_config['Precos'].dropna().astype(float).tolist()
-                    )
-                ]),
-                height=200
-            )
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.subheader("Horários Disponíveis")
+                horarios = st.text_area(
+                    "Horários (um por linha)", 
+                    value="\n".join(df_config['Horarios'].dropna().astype(str).tolist()),
+                    height=200
+                )
+            
+            with col2:
+                st.subheader("Serviços e Preços")
+                servicos_precos = st.text_area(
+                    "Serviço:Preço (um por linha)", 
+                    value="\n".join([
+                        f"{s}:{p}" for s, p in zip(
+                            df_config['Servicos'].dropna().astype(str).tolist(), 
+                            df_config['Precos'].dropna().astype(float).tolist()
+                        )
+                    ]),
+                    height=200
+                )
+            
+            with col3:
+                st.subheader("Datas Disponíveis")
+                datas = st.text_area(
+                    "Datas (DD/MM/YYYY)", 
+                    value="\n".join(df_config['Datas'].dropna().astype(str).tolist()),
+                    height=200
+                )
             
             if st.form_submit_button("Salvar Configurações"):
                 try:
+                    # Processar dados
+                    horarios_lista = [h.strip() for h in horarios.split('\n') if h.strip()]
+                    
                     servicos = []
                     precos = []
                     for linha in servicos_precos.split('\n'):
@@ -294,10 +300,15 @@ def main():
                             except ValueError:
                                 st.warning(f"Ignorando preço inválido: {p}")
                     
+                    datas_lista = [d.strip() for d in datas.split('\n') if d.strip()]
+                    
                     # Criar DataFrame
+                    max_len = max(len(horarios_lista), len(servicos), len(datas_lista))
                     df_novo = pd.DataFrame({
-                        'Servicos': servicos,
-                        'Precos': precos
+                        'Horarios': pd.Series(horarios_lista + [None]*(max_len - len(horarios_lista))),
+                        'Servicos': pd.Series(servicos + [None]*(max_len - len(servicos))),
+                        'Precos': pd.Series(precos + [None]*(max_len - len(precos))),
+                        'Datas': pd.Series(datas_lista + [None]*(max_len - len(datas_lista)))
                     })
                     
                     if salvar_dados(spreadsheet, "Configuracoes", df_novo):
@@ -309,67 +320,6 @@ def main():
                     st.error(f"Erro ao processar dados: {str(e)}")
     
     with tab2:
-        st.header("Configuração de Horários por Data")
-        
-        # Adicionar nova data com horários
-        with st.form("nova_data_form"):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                nova_data = st.date_input("Selecione uma data", min_value=datetime.now().date())
-            
-            with col2:
-                horarios_nova_data = st.text_area(
-                    "Horários para esta data (separados por vírgula)",
-                    value="09:00,10:00,11:00,14:00,15:00,16:00,17:00"
-                )
-            
-            if st.form_submit_button("Adicionar/Atualizar Data"):
-                try:
-                    # Verificar se a data já existe
-                    nova_data_dt = pd.to_datetime(nova_data).date()
-                    df_horarios['Data'] = df_horarios['Data'].apply(parse_date)
-                    
-                    if nova_data_dt in df_horarios['Data'].values:
-                        # Atualizar horários existentes
-                        df_horarios.loc[df_horarios['Data'] == nova_data_dt, 'Horarios'] = horarios_nova_data
-                        st.success(f"Horários atualizados para {nova_data.strftime('%d/%m/%Y')}")
-                    else:
-                        # Adicionar nova data
-                        novo_registro = pd.DataFrame({
-                            'Data': [nova_data_dt],
-                            'Horarios': [horarios_nova_data]
-                        })
-                        df_horarios = pd.concat([df_horarios, novo_registro], ignore_index=True)
-                        st.success(f"Nova data adicionada: {nova_data.strftime('%d/%m/%Y')}")
-                    
-                    # Salvar dados
-                    if salvar_dados(spreadsheet, "Horarios_Por_Data", df_horarios):
-                        time.sleep(2)
-                        st.rerun()
-                
-                except Exception as e:
-                    st.error(f"Erro ao adicionar data: {str(e)}")
-        
-        # Lista de datas configuradas
-        st.subheader("Datas Configuradas")
-        if not df_horarios.empty:
-            df_horarios['Data_Exibicao'] = df_horarios['Data'].apply(
-                lambda x: x.strftime('%d/%m/%Y') if isinstance(x, (datetime, date)) else str(x)
-            )
-            
-            for _, row in df_horarios.iterrows():
-                with st.expander(f"Data: {row['Data_Exibicao']} - Horários: {row['Horarios']}"):
-                    if st.button(f"Remover {row['Data_Exibicao']}", key=f"remover_{row['Data_Exibicao']}"):
-                        df_horarios = df_horarios[df_horarios['Data_Exibicao'] != row['Data_Exibicao']]
-                        if salvar_dados(spreadsheet, "Horarios_Por_Data", df_horarios):
-                            st.success(f"Data {row['Data_Exibicao']} removida!")
-                            time.sleep(2)
-                            st.rerun()
-        else:
-            st.info("Nenhuma data configurada ainda.")
-    
-    with tab3:
         st.header("Agendamentos")
         
         # Seção para novo agendamento
@@ -377,45 +327,32 @@ def main():
             col1, col2 = st.columns(2)
             
             with col1:
-                # Listar apenas datas futuras ou do dia atual
-                datas_disponiveis = []
-                if not df_horarios.empty:
-                    hoje = datetime.now().date()
-                    df_horarios['Data'] = df_horarios['Data'].apply(parse_date)
-                    datas_disponiveis = [
-                        data.strftime('%d/%m/%Y') for data in df_horarios['Data'].unique()
-                        if parse_date(data) >= hoje
-                    ]
+                data_selecionada = st.selectbox(
+                    "Data*",
+                    options=df_config['Datas'].dropna().astype(str).tolist()
+                )
                 
-                if not datas_disponiveis:
-                    st.warning("Nenhuma data disponível para agendamento!")
+                horarios_disponiveis = verificar_horarios_disponiveis(spreadsheet, data_selecionada)
+                
+                if not horarios_disponiveis:
+                    st.warning("Não há horários disponíveis para esta data!")
                 else:
-                    data_selecionada = st.selectbox(
-                        "Data*",
-                        options=sorted(datas_disponiveis)
+                    hora_selecionada = st.selectbox(
+                        "Horário*",
+                        options=horarios_disponiveis
                     )
-                    
-                    horarios_disponiveis = verificar_horarios_disponiveis(spreadsheet, data_selecionada)
-                    
-                    if not horarios_disponiveis:
-                        st.warning("Não há horários disponíveis para esta data!")
-                    else:
-                        hora_selecionada = st.selectbox(
-                            "Horário*",
-                            options=sorted(horarios_disponiveis)
-                        )
-                    
-                    servico_selecionado = st.selectbox(
-                        "Serviço*",
-                        options=df_config['Servicos'].dropna().astype(str).tolist()
-                    )
+                
+                servico_selecionado = st.selectbox(
+                    "Serviço*",
+                    options=df_config['Servicos'].dropna().astype(str).tolist()
+                )
             
             with col2:
                 nome_cliente = st.text_input("Nome do Cliente*", max_chars=50)
                 telefone_cliente = st.text_input("Telefone*", max_chars=15)
                 observacoes = st.text_area("Observações", max_chars=200)
             
-            if st.form_submit_button("Agendar") and datas_disponiveis:
+            if st.form_submit_button("Agendar"):
                 if nome_cliente and telefone_cliente and horarios_disponiveis:
                     try:
                         # Verificação de disponibilidade em tempo real
@@ -534,7 +471,7 @@ def main():
         else:
             st.info("Nenhum agendamento cadastrado.")
     
-    with tab4:
+    with tab3:
         st.header("Relatórios")
         df_agendamentos = carregar_dados(spreadsheet, "Agendamentos")
         
@@ -580,7 +517,7 @@ def main():
         else:
             st.info("Nenhum dado disponível para relatórios.")
     
-    with tab5:
+    with tab4:
         st.header("Depuração e Verificação")
         
         st.subheader("Dados Brutos - Configurações")
@@ -594,12 +531,6 @@ def main():
             st.write(st.session_state['debug_Agendamentos'])
         else:
             st.warning("Dados de agendamentos não carregados")
-        
-        st.subheader("Dados Brutos - Horários por Data")
-        if 'debug_Horarios_Por_Data' in st.session_state:
-            st.write(st.session_state['debug_Horarios_Por_Data'])
-        else:
-            st.warning("Dados de horários por data não carregados")
         
         if not df_agendamentos.empty:
             verificar_consistencia(df_agendamentos)
